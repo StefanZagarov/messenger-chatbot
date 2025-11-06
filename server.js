@@ -94,10 +94,10 @@ app.post("/webhook", (req, res) => {
           console.log(
             `Server received at: ${new Date(serverReceiveTime).toISOString()} (delay: ${facebookToServerDelay}ms)`,
           );
-          console.log(`   • Total round trip: ${totalDelay}ms`);
+          console.log(`Total round trip: ${totalDelay}ms`);
 
           // For now echo back the user's text, later an AI will answer
-          sendMessage(senderId, `You said: "${messageText}" - Echo from bot!`);
+          sendMessage(senderId, `Echo: "${messageText}"`);
         }
       });
     });
