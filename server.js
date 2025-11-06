@@ -67,34 +67,38 @@ app.post("/webhook", (req, res) => {
   if (body.object === "page") {
     body.entry.forEach((entry) => {
       entry.messaging.forEach((event) => {
-        const senderId = event.sender.id;
-
-        // Handle handoff events
+        // HANDLE HUMAN HANDOFF EVENTS FIRST
         if (event.pass_thread_control) {
           console.log(
-            `🔄 Human agent taking over conversation for ${senderId}`,
+            `🔄 Human handoff started - bot going silent for conversation ${event.sender.id}`,
           );
-          return; // Don't respond - human is handling
+          // Don't respond to messages while human has control
+          return;
         }
 
         if (event.take_thread_control) {
-          console.log(`🤖 Bot resuming control for ${senderId}`);
+          console.log(
+            `🤖 Human handoff ended - bot resuming for conversation ${event.sender.id}`,
+          );
+          // Bot can resume responding
+          return;
         }
 
-        // Handle regular messages
+        // Only process messages if bot has thread control
         if (event.message) {
+          const senderId = event.sender.id;
           const messageText = event.message.text || "";
+
           console.log(`💬 Message from ${senderId}: ${messageText}`);
 
-          // Skip bot response if this is an admin message (optional)
-          const ADMIN_PSID = "YOUR_ADMIN_PSID_HERE"; // Get this from your logs
-          if (senderId === ADMIN_PSID) {
-            console.log("👑 Admin message - skipping bot response");
+          // Check if this is a handoff message (ignore system messages)
+          if (messageText.includes("assigned the conversation to you")) {
+            console.log("🚫 Ignoring Facebook system handoff message");
             return;
           }
 
-          // Only respond to non-admin messages
-          sendMessage(senderId, `You said: ${messageText}`);
+          // Echo back the message (your existing logic)
+          sendMessage(senderId, `Echo: ${messageText}`);
         }
       });
     });
