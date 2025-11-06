@@ -30,6 +30,13 @@ app.get("/webhook", (req, res) => {
   }
 });
 
+function sendMessage(recipientId, messageText) {
+  const requestBody = {
+    recipient: { id: recipientId },
+    message: { text: messageText },
+    messaging_type: "RESPONSE"
+  };
+
 // POST endpoint to receive messages
 app.post("/webhook", (req, res) => {
   const body = req.body;
