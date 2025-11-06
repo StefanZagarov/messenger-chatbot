@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import express from "express";
 import bodyParser from "body-parser";
 import request from "request";
+
 dotenv.config();
 
 const app = express();
@@ -58,55 +59,48 @@ app.get("/webhook", (req, res) => {
 
 // POST endpoint to receive messages
 app.post("/webhook", (req, res) => {
-  const serverReceiveTime = Date.now();
-
   const body = req.body;
 
-  console.log(
-    "📥 Received webhook event at server time:",
-    new Date(serverReceiveTime).toISOString(),
-  );
+  console.log("📥 Received webhook event:");
   console.log(JSON.stringify(body, null, 2));
 
   if (body.object === "page") {
     body.entry.forEach((entry) => {
-      const facebookReceiveTime = entry.time;
-
       entry.messaging.forEach((event) => {
+        const senderId = event.sender.id;
+
+        // Handle handoff events
+        if (event.pass_thread_control) {
+          console.log(
+            `🔄 Human agent taking over conversation for ${senderId}`,
+          );
+          return; // Don't respond - human is handling
+        }
+
+        if (event.take_thread_control) {
+          console.log(`🤖 Bot resuming control for ${senderId}`);
+        }
+
+        // Handle regular messages
         if (event.message) {
-          const userSendTime = event.timestamp;
-          const senderId = event.sender.id;
           const messageText = event.message.text || "";
+          console.log(`💬 Message from ${senderId}: ${messageText}`);
 
-          const userToFacebookDelay = facebookReceiveTime - userSendTime;
-          const facebookToServerDelay = serverReceiveTime - facebookReceiveTime;
-          const totalDelay = serverReceiveTime - userSendTime;
+          // Skip bot response if this is an admin message (optional)
+          const ADMIN_PSID = "YOUR_ADMIN_PSID_HERE"; // Get this from your logs
+          if (senderId === ADMIN_PSID) {
+            console.log("👑 Admin message - skipping bot response");
+            return;
+          }
 
-          console.log(`💬 Message from ${senderId}: "${messageText}"`);
-          // Timing logs
-          console.log("Timing Analysis:");
-          console.log(
-            `User sent message at: ${new Date(userSendTime).toISOString()}`,
-          );
-          console.log(
-            `Facebook received at: ${new Date(facebookReceiveTime).toISOString()} (delay: ${userToFacebookDelay}ms)`,
-          );
-          console.log(
-            `Server received at: ${new Date(serverReceiveTime).toISOString()} (delay: ${facebookToServerDelay}ms)`,
-          );
-          console.log(`Total round trip: ${totalDelay}ms`);
-
-          // For now echo back the user's text, later an AI will answer
-          sendMessage(senderId, `Echo: "${messageText}"`);
+          // Only respond to non-admin messages
+          sendMessage(senderId, `You said: ${messageText}`);
         }
       });
     });
-
-    // Must respond with 200 OK within 20 seconds
-    res.status(200).send("EVENT_RECEIVED");
-  } else {
-    res.sendStatus(404);
   }
+
+  res.status(200).send("EVENT_RECEIVED");
 });
 
 // Health check endpoint for Render
