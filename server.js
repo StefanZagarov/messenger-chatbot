@@ -46,7 +46,8 @@ app.post("/webhook", (req, res) => {
 
           console.log(`💬 Message from ${senderId}: ${messageText}`);
 
-          // For now, just log the message - we'll add AI response later
+          // For now echo back the user's text, later an AI will answer
+          sendMessage(senderId, `Echo: ${messageText}`);
         }
       });
     });
