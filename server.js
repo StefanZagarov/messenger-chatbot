@@ -8,9 +8,12 @@ dotenv.config();
 const app = express();
 app.use(bodyParser.json());
 
-// Environment variables - Render will set these in dashboard
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+
+// Track which conversations have human control
+// In production, use Redis or a database instead of in-memory storage
+const humanControlledChats = new Set();
 
 function sendMessage(recipientId, messageText) {
   const requestBody = {
@@ -67,37 +70,54 @@ app.post("/webhook", (req, res) => {
   if (body.object === "page") {
     body.entry.forEach((entry) => {
       entry.messaging.forEach((event) => {
-        // HANDLE HUMAN HANDOFF EVENTS FIRST
+        const senderId = event.sender.id;
+
+        // HANDLE HANDOVER EVENTS
         if (event.pass_thread_control) {
           console.log(
-            `🔄 Human handoff started - bot going silent for conversation ${event.sender.id}`,
+            `🔄 Thread control passed - Human taking over for ${senderId}`,
           );
-          // Don't respond to messages while human has control
+          humanControlledChats.add(senderId);
           return;
         }
 
         if (event.take_thread_control) {
           console.log(
-            `🤖 Human handoff ended - bot resuming for conversation ${event.sender.id}`,
+            `🤖 Thread control taken back - Bot resuming for ${senderId}`,
           );
-          // Bot can resume responding
+          humanControlledChats.delete(senderId);
           return;
         }
 
-        // Only process messages if bot has thread control
+        if (event.request_thread_control) {
+          console.log(
+            `📞 Thread control requested by secondary app for ${senderId}`,
+          );
+          // Optionally: automatically pass control or handle request
+          return;
+        }
+
+        // HANDLE MESSAGES
         if (event.message) {
-          const senderId = event.sender.id;
           const messageText = event.message.text || "";
 
-          console.log(`💬 Message from ${senderId}: ${messageText}`);
-
-          // Check if this is a handoff message (ignore system messages)
-          if (messageText.includes("assigned the conversation to you")) {
-            console.log("🚫 Ignoring Facebook system handoff message");
+          // Ignore message echoes (messages sent by your page)
+          if (event.message.is_echo) {
+            console.log("🔇 Ignoring message echo");
             return;
           }
 
-          // Echo back the message (your existing logic)
+          // Ignore messages while human has control
+          if (humanControlledChats.has(senderId)) {
+            console.log(
+              `🚫 Human has control - bot staying silent for ${senderId}`,
+            );
+            return;
+          }
+
+          console.log(`💬 Message from ${senderId}: ${messageText}`);
+
+          // Your bot logic here
           sendMessage(senderId, `Echo: ${messageText}`);
         }
       });
@@ -107,12 +127,19 @@ app.post("/webhook", (req, res) => {
   res.status(200).send("EVENT_RECEIVED");
 });
 
-// Health check endpoint for Render
+// Health check endpoint
 app.get("/", (req, res) => {
   res.send("Messenger Bot Server is running!");
 });
 
-const PORT = process.env.PORT;
+// Endpoint to check human control status (optional, for debugging)
+app.get("/control-status", (req, res) => {
+  res.json({
+    humanControlledChats: Array.from(humanControlledChats),
+  });
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Webhook URL: https://your-render-url.onrender.com/webhook`);
