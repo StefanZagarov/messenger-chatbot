@@ -11,6 +11,13 @@ app.use(bodyParser.json());
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 
+function sendMessage(recipientId, messageText) {
+  const requestBody = {
+    recipient: { id: recipientId },
+    message: { text: messageText },
+    messaging_type: "RESPONSE",
+  };
+}
 // GET endpoint for Facebook verification
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
@@ -29,13 +36,6 @@ app.get("/webhook", (req, res) => {
     res.sendStatus(403);
   }
 });
-
-function sendMessage(recipientId, messageText) {
-  const requestBody = {
-    recipient: { id: recipientId },
-    message: { text: messageText },
-    messaging_type: "RESPONSE"
-  };
 
 // POST endpoint to receive messages
 app.post("/webhook", (req, res) => {
